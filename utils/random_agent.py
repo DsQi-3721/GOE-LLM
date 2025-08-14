@@ -23,9 +23,9 @@ class RandomAgent(Agent):
         :return: A random action string.
         """
         logger.debug("%s Observation: %r", str(self), clean_obs(observation))
-        actions = observation.split("Your available actions are: ")[-1].strip().split(", ")
+        actions = observation.split("Available actions: ")[-1].split('\n')[0].strip().split(", ")
         action = random.choice(actions)
-        logger.debug("%s Action: %r", str(self), action)
+        logger.debug("%s Action: %r", str(self), action.strip("'"))
         return action
 
     def __str__(self):
@@ -61,8 +61,7 @@ class GtoAgent(Agent):
         :return: A GTO action string.
         """
         logger.debug("%s Observation: %r", str(self), clean_obs(observation))
-        my_id = observation.split("You are Player ")[-1].split(" in Kuhn Poker")[0]
-        info = observation.split("Your card is: ")[-1]
+        info = observation.split("Your card: ", maxsplit=1)[-1]
         my_card = info[1]
 
         action_seq = self.extract_actions(info)
@@ -103,27 +102,48 @@ class GtoAgent(Agent):
     
     def extract_actions(self, info: str) -> list:
         actions = []
-        lines = info.split('\n')
+        line = info.split('History: ', maxsplit=1)[-1].split('\n')[0].strip()
+        if not line:
+            return actions
+        lines = line.split(' -> ')
         for line in lines:
-            if 'submitted move' in line:
-                action = line.split('submitted move: ')[-1][2:-3] # Extract action from '[action]'
-                actions.append(action)
+            if line.startswith("Player 0: "):
+                action = line.split("Player 0: ")[-1].strip()
+            elif line.startswith("Player 1: "):
+                action = line.split("Player 1: ")[-1].strip()
+            else:
+                raise ValueError(f"Unexpected line format: {line}")
+            if action.startswith('[') and action.endswith(']'):
+                actions.append(action[1:-1])
         return actions
 
 '''
-[GAME] You are Player 0 in Kuhn Poker.
-Game Rules:
-- Kuhn Poker uses a 3-card deck with J, Q, K (J lowest, K highest)
+You are an expert Kuhn Poker player.
+
+[Game Rules]
+- Kuhn Poker uses a 3-card deck with J, Q, K (J lowest, K highest).
 - Each player antes 1 chip and receives 1 card each round (note that the cards are dealt without replacement, so you cannot have the same card as your opponent).
-- The player with the highest card wins the pot
+- The player with the highest card wins the pot.
 
-Action Rules:
-- '[check]': Pass without betting (only if no bet is on the table)
-- '[bet]': Add 1 chip to the pot (only if no bet is on the table)
-- '[call]': Match an opponent's bet by adding 1 chip to the pot
-- '[fold]': Surrender your hand and let your opponent win the pot
+[Action Rules]
+- [check]: Pass without betting (only if no bet is on the table)
+- [bet]: Add 1 chip to the pot (only if no bet is on the table)
+- [call]: Match an opponent's bet by adding 1 chip to the pot
+- [fold]: Surrender your hand and let your opponent win the pot
 
-[GAME] Your card is: 'K'
-[GAME] Player 1, submitted move: '[bet]'.
-[GAME] Your available actions are: '[fold]', '[call]'
+[State]
+You are Player 0 (first to act this round).
+Your card: 'J'
+History: Player 0: [check] -> Player 1: [bet]
+Available actions: [fold], [call]
+
+[Output Format]
+``` plaintext
+<think> Your thoughts and reasoning </think>
+\\boxed{{[ACTION]}}
+```
+
+[Important Notes]
+1. You must always include the <think> field to outline your reasoning.
+2. Your final action [ACTION] must be one of the available actions, in \\boxed{{[ACTION]}} format.
 '''

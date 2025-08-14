@@ -178,6 +178,8 @@ class Wrapper(Env):
 class ObservationWrapper(Wrapper):
     def get_observation(self):
         player_id, observation = self.env.get_observation()
+        return player_id, observation # already handle in the env:get_observation
+    
         obs = self.observation(player_id, observation)
         # print(f"Observation for player {player_id}: {observation}", flush=True)
         # print(f"Processed Observation for player {player_id}: {obs}", flush=True)
