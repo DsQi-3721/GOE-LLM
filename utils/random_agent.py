@@ -6,6 +6,15 @@ logger = logging.getLogger(__name__)
 
 import random
 
+def clean_obs(observation: str) -> str:
+    """
+    Clean the observation string by removing unnecessary parts.
+    :param observation: The observation string from the environment.
+    :return: A cleaned observation string.
+    """
+    # Remove the game rules and action rules sections
+    return observation.split('Surrender your hand and let your opponent win the pot')[-1].strip()
+
 class RandomAgent(Agent):
     def __call__(self, observation: str) -> str:
         """
@@ -13,18 +22,18 @@ class RandomAgent(Agent):
         :param observation: The observation string from the environment.
         :return: A random action string.
         """
-        logger.debug(f"RandomAgent Observation: {observation}")
+        logger.debug("%s Observation: %r", str(self), clean_obs(observation))
         actions = observation.split("Your available actions are: ")[-1].strip().split(", ")
         action = random.choice(actions)
-        logger.debug(f"RandomAgent Action: {action}")
-        return "[check]"
+        logger.debug("%s Action: %r", str(self), action)
+        return action
 
     def __str__(self):
         return "RandomAgent"
     
 
 class GtoAgent(Agent):
-    def __init__(self, alpha: float = 1/3):
+    def __init__(self, alpha: float = 0):
         super().__init__()
         self.alpha = alpha
 
@@ -51,7 +60,7 @@ class GtoAgent(Agent):
         :param observation: The observation string from the environment.
         :return: A GTO action string.
         """
-        logger.debug(f"GtoAgent Observation: {observation}")
+        logger.debug("%s Observation: %r", str(self), clean_obs(observation))
         my_id = observation.split("You are Player ")[-1].split(" in Kuhn Poker")[0]
         info = observation.split("Your card is: ")[-1]
         my_card = info[1]
@@ -86,7 +95,7 @@ class GtoAgent(Agent):
             else:
                 action = "[fold]"
             
-        logger.debug(f"GtoAgent Action: {action}")
+        logger.debug("%s Action: %r", str(self), action)
         return action
 
     def __str__(self):

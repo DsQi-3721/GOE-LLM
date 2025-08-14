@@ -76,7 +76,7 @@ class State:
 
     def get_current_player_observation(self):
         current_player_observation = self.observations[self.current_player_id]
-        self.observations[self.current_player_id] = []
+        # self.observations[self.current_player_id] = []
         return current_player_observation
 
     def step(self):

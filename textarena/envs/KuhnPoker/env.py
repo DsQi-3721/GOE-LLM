@@ -6,12 +6,14 @@ from textarena.envs.KuhnPoker.renderer import create_board_str
 
 
 class KuhnPokerEnv(ta.Env):
-    def __init__(self, max_rounds: int = 1):
+    def __init__(self, max_rounds: int = 1, changing_starting_player: bool = True):
         super().__init__()
         self.ante = 1
         self.max_rounds = max_rounds
         self.deck = [0, 1, 2]  # 0=J, 1=Q, 2=K
-        self.legal_action_tree = {"check": {"check": "showdown", "bet": {"fold": "loser", "call": "showdown"}}, "bet": {"fold": "loser", "call": "showdown"}}
+        self.legal_action_tree = {"check": {"check": "showdown", "bet": {"fold": "loser", "call": "showdown2"}}, "bet": {"fold": "loser", "call": "showdown2"}}
+        self.player_0_wins = 0
+        self.changing_starting_player = changing_starting_player
 
     def get_board_str(self): return create_board_str(self.state.game_state)
     def reset(self, num_players: int, seed: Optional[int] = None):
@@ -21,6 +23,7 @@ class KuhnPokerEnv(ta.Env):
         self._init_round() # Initialize the first round
 
     def _init_round(self):
+        print(f"### Starting round {self.state.game_state['current_round'] + 1} out of {self.max_rounds} rounds.", flush=True)
         self.state.game_state["current_round"] += 1
         if self.state.game_state["current_round"] > self.max_rounds: # check if game is complete
             # determine winner 
@@ -39,7 +42,10 @@ class KuhnPokerEnv(ta.Env):
         self.state.game_state["current_legal_action_tree"] = self.legal_action_tree.copy()
 
         # set starting player
-        starting_player = 1 - self.state.game_state["starting_player"]
+        if not self.changing_starting_player:
+            starting_player = 0
+        else:
+            starting_player = 1 - self.state.game_state["starting_player"]
         self.state.game_state["starting_player"] = starting_player 
         self.state.manually_set_current_player_id(new_player_id=starting_player)
 
@@ -64,6 +70,7 @@ class KuhnPokerEnv(ta.Env):
             f"- '[bet]': Add 1 chip to the pot (only if no bet is on the table)\n"
             f"- '[call]': Match an opponent's bet by adding 1 chip to the pot\n"
             f"- '[fold]': Surrender your hand and let your opponent win the pot\n"
+            f"- Note: You must respond with one of the actions in square brackets, '[ACTION]'.\n"
         )
         return (
             f"You are Player {player_id} in a {self.max_rounds} round game of Kuhn Poker.\n"
@@ -84,11 +91,15 @@ class KuhnPokerEnv(ta.Env):
         # self.state.add_observation(from_id=self.state.current_player_id, message=action, observation_type=ta.ObservationType.PLAYER_ACTION)
         match = re.compile(r"\[(Check|Bet|Fold|Call)\]", re.IGNORECASE).search(action.strip()) # Regular expression to capture valid actions: e.g. [Check], [Bet], [Fold], [Call]
         if not match: # Invalid action
+            print(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].", flush=True)
+            # raise ValueError(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].")
             self.state.set_invalid_move(reason="Action must be [Check], [Bet], [Call], or [Fold].")
             return self.state.step()
 
         move = match.group(1).lower()  # 'check', 'bet', 'fold', 'call'
         if move not in self.state.game_state["current_legal_action_tree"].keys():
+            print(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.", flush=True)
+            # raise ValueError(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.")
             legal_actions = ', '.join([f"[{k}]" for k in self.state.game_state["current_legal_action_tree"].keys()])
             self.state.set_invalid_move(reason=f"Action must be {legal_actions}.")
             return self.state.step()
@@ -101,6 +112,11 @@ class KuhnPokerEnv(ta.Env):
             self._set_round_winner(player_id=1-self.state.current_player_id, reason=f"Player {self.state.current_player_id} has folded."); rotate_player=False
         elif self.state.game_state["current_legal_action_tree"] == "showdown":
             self._handle_showdown(); rotate_player=False
+        elif self.state.game_state["current_legal_action_tree"] == "showdown2":
+            self.state.game_state["pot"] += self.ante * 2 # both players bet/call
+            self.state.game_state["player_chips"][0] -= self.ante
+            self.state.game_state["player_chips"][1] -= self.ante
+            self._handle_showdown(); rotate_player=False
         else: # show valid next actions
             legal_actions = ', '.join([f"'[{k}]'" for k in self.state.game_state["current_legal_action_tree"].keys()])
             self.state.add_observation(to_id=1-self.state.current_player_id, message=f"Your available actions are: {legal_actions}", observation_type=ta.ObservationType.GAME_BOARD)
@@ -108,6 +124,7 @@ class KuhnPokerEnv(ta.Env):
 
     def _set_round_winner(self, player_id: int, reason: str):
         self.state.game_state["player_chips"][player_id] += self.state.game_state["pot"]
+        self.player_0_wins += 1 if player_id == 0 else 0 # count player 0 wins
         reason += f" Current scores: Player 0: '{self.state.game_state['player_chips'][0]}'; Player 1: '{self.state.game_state['player_chips'][1]}'"
         self.state.add_observation(message=reason, observation_type=ta.ObservationType.GAME_MESSAGE) # initialize the next cound
 
@@ -115,7 +132,7 @@ class KuhnPokerEnv(ta.Env):
         self.state.observations = {pid: [] for pid in range(self.state.num_players)}
         for pid in range(self.state.num_players):
             self.state.add_observation(to_id=pid, message=self._prompt(player_id=pid, game_state=self.state.game_state), observation_type=ta.ObservationType.PROMPT)
-            # print(self.state.observations[pid])
+        print(f"### Round {self.state.game_state['current_round']} ended. {reason}", flush=True)
 
         self._init_round() # start next round
 
