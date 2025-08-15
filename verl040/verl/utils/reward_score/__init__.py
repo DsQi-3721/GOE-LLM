@@ -87,6 +87,10 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
         from . import poker_bench
 
         res = poker_bench.compute_score(solution_str, ground_truth)
+    elif data_source == "textarena/kuhn_poker":
+        from . import kuhn_poker
+
+        res = kuhn_poker.compute_score(solution_str, ground_truth, extra_info)
     else:
         raise NotImplementedError(f"Reward function is not implemented for {data_source=}")
 

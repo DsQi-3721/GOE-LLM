@@ -3,6 +3,11 @@
 
 set -x
 
+project_name=verl_kuhn_poker
+exp_name=grpo_qwen2.5_7b_v0815
+
+CKPTS_DIR=/data/cuisijia/${project_name}/${exp_name}
+
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/train.parquet \
@@ -34,8 +39,9 @@ python3 -m verl.trainer.main_ppo \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
-    trainer.project_name='verl_kuhn_poker' \
-    trainer.experiment_name='grpo_qwen2.5_7b_v0815' \
+    trainer.project_name="${project_name}" \
+    trainer.experiment_name="${exp_name}" \
+    trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=125 \
