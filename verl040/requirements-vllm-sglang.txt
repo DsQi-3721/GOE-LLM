@@ -1,0 +1,26 @@
+# dependencies for verl-0.4.0, vllm-0.8.5.post1, and sglang-0.4.6.post5
+accelerate
+codetiming
+datasets
+dill
+flash-attn
+hydra-core
+liger-kernel
+numpy<2.0.0
+pandas
+peft
+pyarrow>=19.0.0
+pybind11
+pylatexenc
+pre-commit
+ray[default]>=2.10
+transformers
+wandb
+packaging>=20.0
+uvicorn
+fastapi
+# sglang
+torchvision
+sglang[all]==0.4.6.post5
+torch-memory-saver>=0.0.5
+huggingface_hub

@@ -1,0 +1,7 @@
+# vllm
+vllm==0.8.5.post1
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+tensordict==0.6.2
+torchdata
