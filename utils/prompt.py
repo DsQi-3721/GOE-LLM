@@ -41,12 +41,12 @@ Available actions: {available_actions}
 [Output Format]
 ``` plaintext
 <think> Your thoughts and reasoning </think>
-\\boxed{{[ACTION]}}
+<answer> [ACTION] </answer>
 ```
 
 [Important Notes]
 1. You must always include the <think> field to outline your reasoning.
-2. Your final action [ACTION] must be one of the available actions, in \\boxed{{[ACTION]}} format.
+2. Your final action [ACTION] must be one of the available actions.
 """
 
 # opponent ranges, betting patterns, and card strengths

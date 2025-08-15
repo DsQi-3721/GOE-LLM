@@ -36,6 +36,9 @@ def post_processing(response: str) -> str:
     if "\\boxed{" in response and "}" in response:
         action = response.split("\\boxed{")[-1].split("}")[0].strip()
         return action
+    elif "<answer>" in response and "</answer>" in response:
+        action = response.split("<answer>")[-1].split("</answer>")[0].strip()
+        return action
     else:
         logger.debug("Response format is incorrect: %r", response)
         return response

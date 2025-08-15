@@ -103,16 +103,20 @@ class KuhnPokerEnv(ta.Env):
         if not match: # Invalid action
             print(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].", flush=True)
             # raise ValueError(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].")
-            self.state.set_invalid_move(reason="Action must be [Check], [Bet], [Call], or [Fold].")
-            return self.state.step()
+            # self.state.set_invalid_move(reason="Action must be [Check], [Bet], [Call], or [Fold].")
+            # return self.state.step()
+            self._set_round_winner(player_id=1-self.state.current_player_id, reason=f"Player {self.state.current_player_id} has invalid action '{action}'."); rotate_player=False
+            return self.state.step(rotate_player=rotate_player)
 
         move = match.group(1).lower()  # 'check', 'bet', 'fold', 'call'
         if move not in self.state.game_state["current_legal_action_tree"].keys():
             print(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.", flush=True)
             # raise ValueError(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.")
-            legal_actions = ', '.join([f"[{k}]" for k in self.state.game_state["current_legal_action_tree"].keys()])
-            self.state.set_invalid_move(reason=f"Action must be {legal_actions}.")
-            return self.state.step()
+            # legal_actions = ', '.join([f"[{k}]" for k in self.state.game_state["current_legal_action_tree"].keys()])
+            # self.state.set_invalid_move(reason=f"Action must be {legal_actions}.")
+            # return self.state.step()
+            self._set_round_winner(player_id=1-self.state.current_player_id, reason=f"Player {self.state.current_player_id} has invalid action '{action}'."); rotate_player=False
+            return self.state.step(rotate_player=rotate_player)
 
         self.histroy.append(move)  # Store the action in history
         # execute move
@@ -138,12 +142,12 @@ class KuhnPokerEnv(ta.Env):
         self.state.game_state["player_chips"][player_id] += self.state.game_state["pot"]
         self.player_0_wins += 1 if player_id == 0 else 0 # count player 0 wins
         reason += f" Current scores: Player 0: '{self.state.game_state['player_chips'][0]}'; Player 1: '{self.state.game_state['player_chips'][1]}'"
-        self.state.add_observation(message=reason, observation_type=ta.ObservationType.GAME_MESSAGE) # initialize the next cound
+        # self.state.add_observation(message=reason, observation_type=ta.ObservationType.GAME_MESSAGE) # initialize the next cound
 
-        # clear observations
-        self.state.observations = {pid: [] for pid in range(self.state.num_players)}
-        for pid in range(self.state.num_players):
-            self.state.add_observation(to_id=pid, message=self._prompt(player_id=pid, game_state=self.state.game_state), observation_type=ta.ObservationType.PROMPT)
+        # # clear observations
+        # self.state.observations = {pid: [] for pid in range(self.state.num_players)}
+        # for pid in range(self.state.num_players):
+        #     self.state.add_observation(to_id=pid, message=self._prompt(player_id=pid, game_state=self.state.game_state), observation_type=ta.ObservationType.PROMPT)
         print(f"### Round {self.state.game_state['current_round']} ended. {reason}", flush=True)
 
         self._init_round() # start next round
