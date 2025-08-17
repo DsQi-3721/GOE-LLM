@@ -8,20 +8,21 @@ exp_name=grpo_qwen2.5_7b_v0815
 
 CKPTS_DIR=/data/cuisijia/${project_name}/${exp_name}
 
+# 128000 train samples, 16000 val samples
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/train.parquet \
     data.val_files=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/val.parquet \
-    data.train_batch_size=1024 \
-    data.max_prompt_length=2048 \
-    data.max_response_length=1024 \
+    data.train_batch_size=512 \
+    data.max_prompt_length=1024 \
+    data.max_response_length=512 \
     data.filter_overlong_prompts=False \
     data.truncation='error' \
     actor_rollout_ref.model.path=/data/models/Qwen2.5-7B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=256 \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=32 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=16 \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
