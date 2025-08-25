@@ -1,7 +1,7 @@
 from textarena.core import Agent
 
 import logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 import random
@@ -33,10 +33,13 @@ class RandomAgent(Agent):
     
 
 class GtoAgent(Agent):
-    def __init__(self, alpha: float = 0):
+    def __init__(self, alpha: float = 0, bluffing_counter = False):
         super().__init__()
         self.alpha = alpha
+        self.bluffing_counter = bluffing_counter
+        assert 0 <= alpha <= 1, "Alpha must be between 0 and 1"
 
+        # GTO strategy tables
         self.first_player_gto_1 = {
             "K": {'bet': 3 * alpha, 'check': 1 - 3 * alpha},
             "Q": {'bet': 0.0, 'check': 1.0},
@@ -53,6 +56,35 @@ class GtoAgent(Agent):
             "Q": {'bet': {'call': 1/3, 'fold': 1 - 1/3}, 'check': {'bet': 0.0, 'check': 1.0}},
             "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 1/3, 'check': 1 - 1/3}}
         }
+        self.agent_name = f"GtoAgent({self.alpha})"
+
+        # Bluffing strategy (as first Player)
+        if alpha > 1/3:
+            # min(p, 1), max(p, 0)
+            self.first_player_gto_1 = {k: {k2: max(0, min(1, v2)) for k2, v2 in v.items()} for k, v in self.first_player_gto_1.items()}
+            self.first_player_gto_2 = {k: {k2: max(0, min(1, v2)) for k2, v2 in v.items()} for k, v in self.first_player_gto_2.items()}
+            self.agent_name = f"Bluffing({self.alpha})"
+
+        # Counter bluffing strategy (as second Player)
+        if bluffing_counter:
+            self.alpha = 1/3
+            self.first_player_gto_1 = {
+                "K": {'bet': 1.0, 'check': 0.0},
+                "Q": {'bet': 0.0, 'check': 1.0},
+                "J": {'bet': 1/3, 'check': 2/3},
+            }
+            self.first_player_gto_2 = {
+                "K": {'call': 1.0, 'fold': 0.0},
+                "Q": {'call': 2/3, 'fold': 1/3},
+                "J": {'call': 0.0, 'fold': 1.0}
+            }
+            # always call/bet with K, Q; always fold/check with J
+            self.second_player_gto = {
+                "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+                "Q": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+                "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
+            }
+            self.agent_name = f"Bluffing_counter({self.alpha})"
 
     def __call__(self, observation: str) -> str:
         """
@@ -68,13 +100,13 @@ class GtoAgent(Agent):
 
         rand_num = random.random()
         if len(action_seq) == 0:
-            print(f"[DEBUGGING] im the first player, my card is {my_card}, rand num is {rand_num}", flush=True)
+            # print(f"[DEBUGGING] im the first player, my card is {my_card}, rand num is {rand_num}", flush=True)
             if rand_num < self.first_player_gto_1[my_card]['bet']: 
                 action = "[bet]"
             else:
                 action = "[check]"
         elif len(action_seq) == 1:
-            print(f"[DEBUGGING] im the second player, my card is {my_card}, rand num is {rand_num}, action seq is {action_seq}", flush=True)
+            # print(f"[DEBUGGING] im the second player, my card is {my_card}, rand num is {rand_num}, action seq is {action_seq}", flush=True)
             if action_seq[0] == 'bet':
                 if rand_num < self.second_player_gto[my_card]['bet']['call']:
                     action = "[call]"
@@ -88,7 +120,7 @@ class GtoAgent(Agent):
             else:
                 raise ValueError(f"Unexpected action sequence: {action_seq[0]}")
         elif len(action_seq) == 2:
-            print(f"[DEBUGGING] im the first player, my card is {my_card}, rand num is {rand_num}, action seq is {action_seq}", flush=True)
+            # print(f"[DEBUGGING] im the first player, my card is {my_card}, rand num is {rand_num}, action seq is {action_seq}", flush=True)
             if rand_num < self.first_player_gto_2[my_card]['call']:
                 action = "[call]"
             else:
@@ -98,7 +130,7 @@ class GtoAgent(Agent):
         return action
 
     def __str__(self):
-        return "GtoAgent"
+        return self.agent_name
     
     def extract_actions(self, info: str) -> list:
         actions = []
@@ -116,6 +148,16 @@ class GtoAgent(Agent):
             if action.startswith('[') and action.endswith(']'):
                 actions.append(action[1:-1])
         return actions
+
+if __name__ == "__main__":
+    # Example usage
+    agent = GtoAgent(alpha=0.0)
+    agent = GtoAgent(alpha=0.2)
+    agent = GtoAgent(alpha=1/3)
+
+    agent = GtoAgent(alpha=0.34)
+    agent = GtoAgent(alpha=0.5)
+    agent = GtoAgent(alpha=1)
 
 '''
 You are an expert Kuhn Poker player.

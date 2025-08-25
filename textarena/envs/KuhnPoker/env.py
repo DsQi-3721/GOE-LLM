@@ -5,6 +5,7 @@ import textarena as ta
 from textarena.envs.KuhnPoker.renderer import create_board_str
 
 from utils.prompt import prompt_template
+DEBUGGING = False
 
 class KuhnPokerEnv(ta.Env):
     def __init__(self, max_rounds: int = 1, changing_starting_player: bool = True):
@@ -38,7 +39,7 @@ class KuhnPokerEnv(ta.Env):
             elif self.state.game_state["player_chips"][0] < self.state.game_state["player_chips"][1]: self.state.set_winner(player_id=1, reason=f"Player 1 won by having more chips at the end of all {self.max_rounds} rounds.")
             else: self.state.set_draw(reason=f"At the end of {self.max_rounds} rounds, both players had the same number of chips.")
 
-        print(f"### Starting round {self.state.game_state['current_round']} out of {self.max_rounds} rounds.", flush=True)
+        if DEBUGGING: print(f"### Starting round {self.state.game_state['current_round']} out of {self.max_rounds} rounds.", flush=True)
         random.shuffle(self.deck) # shuffle the deck 
         self.state.game_state["player_cards"] = {0: self.deck[0], 1: self.deck[1]} # assign player cards
         # reset pot
@@ -101,7 +102,7 @@ class KuhnPokerEnv(ta.Env):
         # self.state.add_observation(from_id=self.state.current_player_id, message=action, observation_type=ta.ObservationType.PLAYER_ACTION)
         match = re.compile(r"\[(Check|Bet|Fold|Call)\]", re.IGNORECASE).search(action.strip()) # Regular expression to capture valid actions: e.g. [Check], [Bet], [Fold], [Call]
         if not match: # Invalid action
-            print(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].", flush=True)
+            if DEBUGGING: print(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].", flush=True)
             # raise ValueError(f"Invalid action: {action}. Valid actions are: [Check], [Bet], [Fold], [Call].")
             # self.state.set_invalid_move(reason="Action must be [Check], [Bet], [Call], or [Fold].")
             # return self.state.step()
@@ -110,7 +111,7 @@ class KuhnPokerEnv(ta.Env):
 
         move = match.group(1).lower()  # 'check', 'bet', 'fold', 'call'
         if move not in self.state.game_state["current_legal_action_tree"].keys():
-            print(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.", flush=True)
+            if DEBUGGING: print(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.", flush=True)
             # raise ValueError(f"Invalid action: {action}. Valid actions are: {', '.join(self.state.game_state['current_legal_action_tree'].keys())}.")
             # legal_actions = ', '.join([f"[{k}]" for k in self.state.game_state["current_legal_action_tree"].keys()])
             # self.state.set_invalid_move(reason=f"Action must be {legal_actions}.")
@@ -148,7 +149,7 @@ class KuhnPokerEnv(ta.Env):
         # self.state.observations = {pid: [] for pid in range(self.state.num_players)}
         # for pid in range(self.state.num_players):
         #     self.state.add_observation(to_id=pid, message=self._prompt(player_id=pid, game_state=self.state.game_state), observation_type=ta.ObservationType.PROMPT)
-        print(f"### Round {self.state.game_state['current_round']} ended. {reason}", flush=True)
+        if DEBUGGING: print(f"### Round {self.state.game_state['current_round']} ended. {reason}", flush=True)
 
         self._init_round() # start next round
 
