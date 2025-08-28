@@ -39,7 +39,7 @@ class GtoAgent(Agent):
         self.bluffing_counter = bluffing_counter
         assert 0 <= alpha <= 1, "Alpha must be between 0 and 1"
 
-        # GTO strategy tables
+        # GTO strategy tables [0, 1/3]
         self.first_player_gto_1 = {
             "K": {'bet': 3 * alpha, 'check': 1 - 3 * alpha},
             "Q": {'bet': 0.0, 'check': 1.0},
@@ -149,16 +149,135 @@ class GtoAgent(Agent):
                 actions.append(action[1:-1])
         return actions
 
+def describe_opponent(agent_name: str) -> str:
+    """
+    Translate agent name string into a natural language description
+    for LLM prompt conditioning.
+    """
+    agent_name = agent_name.strip()
+
+    if agent_name == "RandomAgent":
+        return ("The opponent plays completely randomly, without any consistent strategy. "
+                "Their actions are unpredictable and not based on card strength.")
+    
+    if agent_name.startswith("Bluffing_counter"):
+        return ("The opponent expects bluffs and therefore calls more often with medium-strength hands (Q). "
+                "They rarely fold against bets if they hold K or Q, but fold J consistently. "
+                "They are sticky and difficult to bluff.")
+    
+    if agent_name.startswith("Bluffing"):
+        # extract alpha if present
+        try:
+            alpha = float(agent_name.split("(")[-1].rstrip(")"))
+        except Exception:
+            alpha = None
+        if alpha is not None and alpha >= 0.9:
+            return ("The opponent plays an extremely aggressive pure bluffing style. "
+                    "They often bet and raise regardless of card strength, even with the weakest hands. "
+                    "They are highly exploitable by calling them down with strong hands.")
+        elif alpha is not None and alpha >= 0.6:
+            return ("The opponent over-bluffs frequently with weak card. "
+                    "They are aggressive and bet/call too often, making them exploitable by calling wider.")
+        else:
+            return ("The opponent plays a somewhat bluff-heavy strategy, "
+                    "mixing in more weak bluffs than an equilibrium strategy would.")
+    
+    if agent_name.startswith("GtoAgent"):
+        # parse alpha value
+        try:
+            alpha = float(agent_name.split("(")[-1].rstrip(")"))
+        except Exception:
+            alpha = None
+        
+        # if alpha is None:
+        return ("The opponent attempts to play according to equilibrium strategies, "
+                "balancing value bets and bluffs.")
+        # elif alpha == 0.0:
+        #     return ("The opponent plays very conservatively. "
+        #             "They almost never bluff and usually fold weak hands. ")
+        #             # "They only bet with strong cards, making them exploitable by bluffing more often.")
+        # elif abs(alpha - 1/3) < 1e-6:
+        #     return ("The opponent plays close to Nash equilibrium (GTO). "
+        #             "They balance bluffs with J and value bets with K, and defend with Q appropriately. "
+        #             "They are difficult to exploit.")
+        # elif alpha < 1/3:
+        #     return ("The opponent plays a cautious GTO-like strategy with fewer bluffs. "
+        #             "They tend to fold weak hands too often, which makes them exploitable by bluffing.")
+        # elif alpha > 1/3:
+        #     return ("The opponent plays a bluff-heavy GTO-like strategy, "
+        #             "bluffing more than equilibrium would suggest. "
+        #             "They can be exploited by calling more frequently.")
+    
+    # fallback
+    raise ValueError(f"Unknown agent name: {agent_name}")
+    return "The opponent’s strategy is unknown or unusual."
+
+def rebuild_prompts(parquet_path: str, output_path: str):
+    from utils.prompt import prompt_template_opponent
+    import pandas as pd
+    df = pd.read_parquet(parquet_path)
+    print(f"Loaded {len(df)} rows from {parquet_path}")
+
+    def rebuild_prompt(row):
+        # 取出对手描述
+        opponent_desc = describe_opponent(row["extra_info"]["opponent_name"])
+
+        # 格式化 new_prompt
+        new_prompt: str = row["prompt"][1]['content']
+        # print(f"Original prompt:\n{new_prompt}\n")
+        new_prompt = new_prompt.replace("[Output Format]", f"""[Opponent Model]
+The opponent is estimated to follow this strategy: {opponent_desc}
+You may reason about the opponent's ranges, betting patterns, and card strengths.
+
+[Output Format]""")
+        # print(f"Rebuilt prompt:\n{new_prompt}\n")
+
+        # 替换 user content
+        prompt = row["prompt"].copy()
+        prompt[1] = {
+            "role": "user",
+            "content": new_prompt,
+        }
+        return prompt
+
+    df["prompt"] = df.apply(rebuild_prompt, axis=1)
+    df.to_parquet(output_path, index=False)
+    print(f"Rebuilt prompts and saved to {output_path}")
+
 if __name__ == "__main__":
-    # Example usage
-    agent = GtoAgent(alpha=0.0)
-    agent = GtoAgent(alpha=0.2)
-    agent = GtoAgent(alpha=1/3)
+    # 训练数据
+    agent = RandomAgent()       # 随机策略
+    print(describe_opponent(str(agent)))
+    agent = GtoAgent(alpha=0.0) # gto策略 (alpha=0)
+    print(describe_opponent(str(agent)))
+    agent = GtoAgent(alpha=1/3) # gto策略 (alpha=1/3)
+    print(describe_opponent(str(agent)))
+    agent = GtoAgent(alpha=0.5) # 诈唬策略 (alpha=1/2)
+    print(describe_opponent(str(agent)))
 
-    agent = GtoAgent(alpha=0.34)
-    agent = GtoAgent(alpha=0.5)
-    agent = GtoAgent(alpha=1)
+    # 测试数据（除了已有的训练数据，还有OOD数据）
+    agent = GtoAgent(alpha=1/6) # gto策略 (alpha=1/6)
+    print(describe_opponent(str(agent)))
+    agent = GtoAgent(alpha=1/5) # gto策略 (alpha=1/5)
+    print(describe_opponent(str(agent)))
+    agent = GtoAgent(alpha=2/3) # 诈唬策略 (alpha=2/3)
+    print(describe_opponent(str(agent)))
+    agent = GtoAgent(alpha=1.0) # 纯诈唬策略
+    print(describe_opponent(str(agent)))
 
+    # # read parquet file
+    # rebuild_prompts("/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixed_train_64k.parquet", 
+    #                 "/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixedoppo_train_64k.parquet")
+    # rebuild_prompts("/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixed_val_64k.parquet", 
+    #                 "/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixedoppo_val_64k.parquet")
+    
+    # import pandas as pd
+    # # check the rebuilt prompts
+    # df = pd.read_parquet("/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixedoppo_train_64k.parquet")
+    # print(df.iloc[0]["prompt"][1]['content'])
+    # df = pd.read_parquet("/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixedoppo_val_64k.parquet")
+    # print(df.iloc[0]["prompt"][1]['content'])
+    
 '''
 You are an expert Kuhn Poker player.
 

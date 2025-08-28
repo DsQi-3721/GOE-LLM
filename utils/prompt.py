@@ -52,8 +52,38 @@ Available actions: {available_actions}
 # opponent ranges, betting patterns, and card strengths
 # You may reason about the opponent's ranges, betting patterns, and card strengths.
 
-#TODO
-prompt_template_opponent = """
+prompt_template_opponent = """You are an expert Kuhn Poker player.
+
+[Game Rules]
+- Kuhn Poker uses a 3-card deck with J, Q, K (J lowest, K highest).
+- Each player antes 1 chip and receives 1 card each round (note that the cards are dealt without replacement, so you cannot have the same card as your opponent).
+- The player with the highest card wins the pot.
+
+[Action Rules]
+- [check]: Pass without betting (only if no bet is on the table)
+- [bet]: Add 1 chip to the pot (only if no bet is on the table)
+- [call]: Match an opponent's bet by adding 1 chip to the pot
+- [fold]: Surrender your hand and let your opponent win the pot
+
+[State]
+You are Player {player_id} ({first} to act this round).
+Your card: '{card}'
+History: {history}
+Available actions: {available_actions}
+
+[Opponent Model]
+The opponent is estimated to follow this strategy: {opponent_description}.
+You may reason about the opponent's ranges, betting patterns, and card strengths.
+
+[Output Format]
+``` plaintext
+<think> Your thoughts and reasoning </think>
+<answer> [ACTION] </answer>
+```
+
+[Important Notes]
+1. You must always include the <think> field to outline your reasoning.
+2. Your final action [ACTION] must be one of the available actions.
 """
 
 # Reference prompt from ToolRL
