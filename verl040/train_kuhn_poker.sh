@@ -4,21 +4,23 @@
 set -x
 
 project_name=verl_kuhn_poker
-exp_name=grpo_qwen2.5_7b_v0815
+model_path=/data/models/Qwen2.5-7B-Instruct
+exp_name=qwen2.5_7b_mixed_64k_v0824
+train_data=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixed_train_64k.parquet
+val_data=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/mixed_val_64k.parquet
 
 CKPTS_DIR=/data/cuisijia/${project_name}/${exp_name}
 
-# 128000 train samples, 16000 val samples
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
-    data.train_files=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/train.parquet \
-    data.val_files=/home/cuisijia/llm_opponent_modeling/data/kuhn_poker/val.parquet \
+    data.train_files=${train_data} \
+    data.val_files=${val_data} \
     data.train_batch_size=512 \
     data.max_prompt_length=1024 \
     data.max_response_length=512 \
     data.filter_overlong_prompts=False \
     data.truncation='error' \
-    actor_rollout_ref.model.path=/data/models/Qwen2.5-7B-Instruct \
+    actor_rollout_ref.model.path=${model_path} \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=128 \
@@ -45,6 +47,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
-    trainer.save_freq=125 \
-    trainer.test_freq=5 \
-    trainer.total_epochs=1 $@
+    trainer.save_freq=100 \
+    trainer.test_freq=1 \
+    trainer.total_epochs=2 $@
