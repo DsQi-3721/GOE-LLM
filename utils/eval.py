@@ -95,17 +95,15 @@ if __name__ == "__main__":
         "bluffing": [GtoAgent(1/2), GtoAgent(2/3), GtoAgent(5/6), GtoAgent(1)],
     }
 
-    from utils.llm_agent import VLLMAgent
     # model path in cmd line: python -m utils.eval /data/models/Qwen2.5-3B-Instruct
     model_path = None
     if len(sys.argv) > 1:
         model_path = sys.argv[1]
+        from utils.llm_agent import VLLMAgent
+        eval_agent = VLLMAgent(temperature=0, model_path=model_path)
     if model_path is None:
-        model_path = "/data/models/Qwen2.5-7B-Instruct"
-
-    eval_agent = VLLMAgent(temperature=0, model_path=model_path)
-
-    # eval_agent = GtoAgent(0)
+        eval_agent = RandomAgent()
+        eval_agent = GtoAgent(0)
 
     for opponent_list in all_opponents.values():
         for opponent in opponent_list:
