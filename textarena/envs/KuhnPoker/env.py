@@ -8,7 +8,8 @@ from utils.prompt import prompt_template
 DEBUGGING = False
 
 class KuhnPokerEnv(ta.Env):
-    def __init__(self, max_rounds: int = 1, changing_starting_player: bool = True):
+    def __init__(self, max_rounds: int = 1, changing_starting_player: bool = True, 
+                 player_0_card: Optional[int] = None, player_1_card: Optional[int] = None):
         super().__init__()
         self.ante = 1
         self.max_rounds = max_rounds
@@ -18,7 +19,13 @@ class KuhnPokerEnv(ta.Env):
         self.changing_starting_player = changing_starting_player
 
         self.new_prompt = prompt_template
-        self.histroy = []
+        self.history = []
+        assert player_0_card in [None, 0, 1, 2] and player_1_card in [None, 0, 1, 2], "player_x_card must be None, 0 (J), 1 (Q), or 2 (K)."
+        if player_0_card is not None and player_1_card is not None:
+            self.default_deck = [player_0_card, player_1_card, 3-player_0_card-player_1_card]
+            self.deck = self.default_deck.copy()
+        else:
+            self.default_deck = None
 
     def get_board_str(self): return create_board_str(self.state.game_state)
 
@@ -29,7 +36,7 @@ class KuhnPokerEnv(ta.Env):
         self._init_round() # Initialize the first round
 
     def _init_round(self):
-        self.histroy = []
+        self.history = []
 
         self.state.game_state["current_round"] += 1
         if self.state.game_state["current_round"] > self.max_rounds: # check if game is complete
@@ -40,7 +47,8 @@ class KuhnPokerEnv(ta.Env):
             else: self.state.set_draw(reason=f"At the end of {self.max_rounds} rounds, both players had the same number of chips.")
 
         if DEBUGGING: print(f"### Starting round {self.state.game_state['current_round']} out of {self.max_rounds} rounds.", flush=True)
-        random.shuffle(self.deck) # shuffle the deck 
+        if self.default_deck is None:
+            random.shuffle(self.deck) # shuffle the deck 
         self.state.game_state["player_cards"] = {0: self.deck[0], 1: self.deck[1]} # assign player cards
         # reset pot
         self.state.game_state["pot"] = self.ante * 2
@@ -119,7 +127,7 @@ class KuhnPokerEnv(ta.Env):
             self._set_round_winner(player_id=1-self.state.current_player_id, reason=f"Player {self.state.current_player_id} has invalid action '{action}'."); rotate_player=False
             return self.state.step(rotate_player=rotate_player)
 
-        self.histroy.append(move)  # Store the action in history
+        self.history.append(move)  # Store the action in history
         # execute move
         # self.state.add_observation(message=f"Player {self.state.current_player_id}, submitted move: '[{move}]'.", observation_type=ta.ObservationType.GAME_ACTION_DESCRIPTION)
         self.state.game_state["current_legal_action_tree"] = self.state.game_state["current_legal_action_tree"][move]
@@ -187,10 +195,10 @@ class KuhnPokerEnv(ta.Env):
         )
     
     def get_history_str(self):
-        if not self.histroy:
+        if not self.history:
             return ""
         # Player 0: [action1] -> Player 1: [action2] -> Player 0: [action3] ...
         history_str = " -> ".join(
-            f"Player {(i + self.state.game_state['starting_player']) % 2}: [{action}]" for i, action in enumerate(self.histroy)
+            f"Player {(i + self.state.game_state['starting_player']) % 2}: [{action}]" for i, action in enumerate(self.history)
         )
         return history_str

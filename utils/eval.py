@@ -36,7 +36,7 @@ def run_eval(eval_agent, opponent_agent, max_rounds=1000):
                 action = f'[{match.group(1).lower()}]'
                 if action in ["[check]", "[bet]", "[fold]", "[call]"]:
                     card = env0._rank_to_str(env0.state.game_state["player_cards"][player_id])
-                    his = '->'.join(env0.histroy)
+                    his = '->'.join(env0.history)
                     if his not in dh.tree["as_player_0"][card]:
                         dh.tree["as_player_0"][card][his] = {}
                     dh.tree["as_player_0"][card][his][action.lower()] = dh.tree["as_player_0"][card][his].get(action.lower(), 0) + 1
@@ -59,7 +59,7 @@ def run_eval(eval_agent, opponent_agent, max_rounds=1000):
                 action = f'[{match.group(1).lower()}]'
                 if action in ["[check]", "[bet]", "[fold]", "[call]"]:
                     card = env1._rank_to_str(env1.state.game_state["player_cards"][player_id])
-                    his = '->'.join(env1.histroy)
+                    his = '->'.join(env1.history)
                     if his not in dh.tree["as_player_1"][card]:
                         dh.tree["as_player_1"][card][his] = {}
                     dh.tree["as_player_1"][card][his][action.lower()] = dh.tree["as_player_1"][card][his].get(action.lower(), 0) + 1

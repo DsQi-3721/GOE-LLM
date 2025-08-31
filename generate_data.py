@@ -63,7 +63,7 @@ def generate_data(start_index, agent1, agent2, total_rounds=32000, changing_star
         # env.state.game_state is dict, copy it to avoid mutation
         player_card = env._rank_to_str(env.state.game_state["player_cards"][player_id])
         opponent_card = env._rank_to_str(env.state.game_state["player_cards"][1 - player_id])
-        action_history = ('->'.join(env.histroy) + '->') if env.histroy else ''
+        action_history = ('->'.join(env.history) + '->') if env.history else ''
         game_state = copy.deepcopy(env.state.game_state)
 
         action = agents[player_id](observation)
