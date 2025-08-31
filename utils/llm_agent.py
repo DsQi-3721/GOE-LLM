@@ -55,7 +55,7 @@ def post_processing(response: str) -> str:
         logger.debug("Response format is incorrect: %r", response)
         return response
 
-def call_llm(messages: list[dict], sampling_params, model: LLM, tokenizer, thinking: bool = False) -> str:
+def call_llm(messages: list[dict], sampling_params, model: LLM, tokenizer, thinking: bool = False) -> list[str]:
     text = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
@@ -63,8 +63,8 @@ def call_llm(messages: list[dict], sampling_params, model: LLM, tokenizer, think
         enable_thinking=thinking,
     )
     response = model.generate([text], sampling_params=sampling_params, use_tqdm=False)
-    output = response[0].outputs[0].text
-    return output.strip()
+    results = [output.text for output in response[0].outputs]
+    return [res.strip() for res in results]
 
 # ===== Agent 本体：首次实例化才加载，多个实例共享 =====
 class VLLMAgent(Agent):
@@ -102,7 +102,18 @@ class VLLMAgent(Agent):
         ]
         response = call_llm(messages, self.sampling_params, model=self.model, tokenizer=self.tokenizer, thinking=True)
         logger.debug("%s Action: %r", str(self), response)
-        return post_processing(response)
+        return post_processing(response[0])
+
+    def call_parallel(self, observation: str, n=1) -> list[str]:
+        self.sampling_params.n = n
+        logger.debug("%s Observation (parallel): %r", str(self), clean_obs(observation))
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": observation},
+        ]
+        response = call_llm(messages, self.sampling_params, model=self.model, tokenizer=self.tokenizer, thinking=True)
+        logger.debug("%s Actions (parallel): %r", str(self), response)
+        return [post_processing(resp) for resp in response]
 
     def __str__(self):
         return (f"VLLMAgent(model={self._model_path}, tp={self._tp_size}, "

@@ -129,6 +129,18 @@ class GtoAgent(Agent):
         logger.debug("%s Action: %r", str(self), action)
         return action
 
+    def call_parallel(self, observation: str, n: int) -> list:
+        """
+        Call the agent with a list of observations and return a list of GTO actions.
+        :param observations: A list of observation strings from the environment.
+        :return: A list of GTO action strings.
+        """
+        actions = []
+        for i in range(n):
+            action = self.__call__(observation)
+            actions.append(action)
+        return actions
+
     def __str__(self):
         return self.agent_name
     
@@ -145,8 +157,8 @@ class GtoAgent(Agent):
                 action = line.split("Player 1: ")[-1].strip()
             else:
                 raise ValueError(f"Unexpected line format: {line}")
-            if action.startswith('[') and action.endswith(']'):
-                actions.append(action[1:-1])
+            assert action.startswith('[') and action.endswith(']'), f"Unexpected action format: {action}"
+            actions.append(action[1:-1])
         return actions
 
 def describe_opponent(agent_name: str) -> str:
