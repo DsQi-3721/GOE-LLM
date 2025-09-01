@@ -220,6 +220,13 @@ def describe_opponent(agent_name: str) -> str:
         #             "bluffing more than equilibrium would suggest. "
         #             "They can be exploited by calling more frequently.")
     
+    if agent_name.startswith("DynamicAgent"):
+        # 提取当前策略名称
+        current_strategy = agent_name.split("Current: ")[-1].rstrip(")")
+        return (f"The opponent is a dynamic agent that switches strategies periodically. "
+                f"The current strategy is: {current_strategy}. "
+                f"This agent adapts its behavior dynamically, making it harder to predict.")
+
     # fallback
     raise ValueError(f"Unknown agent name: {agent_name}")
     return "The opponent’s strategy is unknown or unusual."
