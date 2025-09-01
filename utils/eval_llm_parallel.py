@@ -144,9 +144,9 @@ def run_eval(eval_agent, opponent_agent, each_deck_rounds=500):
 if __name__ == "__main__":
     
     all_opponents = {
-        # "random": [RandomAgent()],
+        "random": [RandomAgent()],
         "gto": [GtoAgent(0), GtoAgent(1/6), GtoAgent(1/3)],
-        # "bluffing": [GtoAgent(1/2), GtoAgent(2/3), GtoAgent(5/6), GtoAgent(1)],
+        "bluffing": [GtoAgent(1/2), GtoAgent(2/3), GtoAgent(5/6), GtoAgent(1)],
     }
 
     # model path in cmd line: python -m utils.eval /data/models/Qwen2.5-3B-Instruct
@@ -157,8 +157,8 @@ if __name__ == "__main__":
         eval_agent = VLLMAgent(model_path=model_path)
         # eval_agent = GtoAgent(0.22)
     else:
-        eval_agent = GtoAgent(0.22)
-        # assert False, "Please provide the model path in command line: python -m utils.eval /data/models/Qwen2.5-3B-Instruct"
+        # eval_agent = GtoAgent(0.22)
+        assert False, "Please provide the model path in command line: python -m utils.eval /data/models/Qwen2.5-3B-Instruct"
 
     for opponent_list in all_opponents.values():
         for opponent in opponent_list:

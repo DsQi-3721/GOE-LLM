@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 logger = logging.getLogger(__name__)
 
 # ===== 默认配置（可改） =====
-DEFAULT_MODEL_PATH = "/data/models/Qwen2.5-7B-Instruct"
+DEFAULT_MODEL_PATH = "/data/models/Qwen2.5-3B-Instruct"
 DEFAULT_TP_SIZE = 2
 
 # ===== 懒加载单例（模块级共享）=====
@@ -38,7 +38,11 @@ def _get_shared_backend(model_path: str = DEFAULT_MODEL_PATH, tensor_parallel_si
     with __BACKEND_LOCK:
         if __SHARED_MODEL is None or __SHARED_TOKENIZER is None:
             logger.info("Initializing shared LLM: model=%s, tp=%d", model_path, tensor_parallel_size)
-            __SHARED_MODEL = LLM(model=model_path, tensor_parallel_size=tensor_parallel_size)
+            __SHARED_MODEL = LLM(
+                model=model_path,
+                tensor_parallel_size=tensor_parallel_size,
+                # gpu_memory_utilization=0.6,
+            )
             __SHARED_TOKENIZER = AutoTokenizer.from_pretrained(model_path)
             __SHARED_CFG = {"model_path": model_path, "tp_size": tensor_parallel_size}
     return __SHARED_MODEL, __SHARED_TOKENIZER
