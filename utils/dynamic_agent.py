@@ -1,5 +1,5 @@
 from textarena.core import Agent
-from random_agent import RandomAgent, GtoAgent, describe_opponent
+from utils.random_agent import RandomAgent, GtoAgent, describe_opponent
 import logging
 import random
 
@@ -11,14 +11,14 @@ class DynamicAgent(Agent):
         """
         Initialize the DynamicAgent with a random interval range and a list of strategies.
         :param interval_range: A tuple (min_interval, max_interval) defining the range for random intervals.
-        :param strategies: List of tuples (strategy_class, strategy_kwargs) to define the strategies.
+        :param strategies: List of strategies.
         :param randomize_strategy: Whether to switch strategies in a random order.
         """
         super().__init__()
         self.min_interval, self.max_interval = interval_range
-        self.strategies = [strategy_class(**kwargs) for strategy_class, kwargs in strategies]
+        self.strategies = strategies
         self.randomize_strategy = randomize_strategy
-        self.current_strategy_index = 0
+        self.current_strategy_index = 0 if not randomize_strategy else random.randint(0, len(self.strategies) - 1)
         self.current_step = 0
         self.next_switch_step = self._generate_random_interval()
 
@@ -54,26 +54,29 @@ class DynamicAgent(Agent):
 
         # Delegate action to the current strategy
         action = self.strategies[self.current_strategy_index](observation)
-        self.current_step += 1
+        if observation.split('History: ', maxsplit=1)[-1].split('\n')[0].strip().count("->") == 1:
+            pass # check -> bet: second action time of player0, same round
+        else:
+            self.current_step += 1
         return action
 
     def __str__(self):
         """
-        Return the name of the current strategy.
+        Return the name of dynamic agent.
         """
-        return f"DynamicAgent(Current: {str(self.strategies[self.current_strategy_index])})"
+        return f"DynamicAgent(interval_range=({self.min_interval}, {self.max_interval}), strategies={[str(s) for s in self.strategies]}, randomize_strategy={self.randomize_strategy})"
 
 if __name__ == "__main__":
     # Example usage
     strategies = [
-        (RandomAgent, {}),
-        (GtoAgent, {"alpha": 0.0}), 
-        (GtoAgent, {"alpha": 1/6}), 
-        (GtoAgent, {"alpha": 1/3}),
-        (GtoAgent, {"alpha": 1/2}),
-        (GtoAgent, {"alpha": 2/3}),
-        (GtoAgent, {"alpha": 5/6}),
-        (GtoAgent, {"alpha": 1}),
+        RandomAgent(),
+        GtoAgent(0.0),
+        GtoAgent(1/6),
+        GtoAgent(1/3),
+        GtoAgent(1/2),
+        GtoAgent(2/3),
+        GtoAgent(5/6),
+        GtoAgent(1),
     ]
 
     # Random order switching
