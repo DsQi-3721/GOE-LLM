@@ -71,11 +71,14 @@ def call_llm(messages: list[dict], sampling_params, model: LLM, tokenizer, think
     return [res.strip() for res in results]
 
 # ===== Agent 本体：首次实例化才加载，多个实例共享 =====
+MAX_N = 64  # vLLM n参数上限
+
 class VLLMAgent(Agent):
     def __init__(
         self,
         temperature: float = 0.7,
         top_p: float = 0.95,
+        top_k = -1,
         max_tokens: int = 512,
         *,
         # 可选：依赖注入/自定义加载配置
@@ -86,7 +89,12 @@ class VLLMAgent(Agent):
     ):
         super().__init__()
         self.system_prompt = STANDARD_GAME_PROMPT
-        self.sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        self.sampling_params = SamplingParams(
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=max_tokens,
+        )
 
         # 如果用户没手动注入，就拿共享单例（懒加载）
         if model is None or tokenizer is None:
@@ -104,20 +112,34 @@ class VLLMAgent(Agent):
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": observation},
         ]
-        response = call_llm(messages, self.sampling_params, model=self.model, tokenizer=self.tokenizer, thinking=True)
+        response = call_llm(messages, self.sampling_params, model=self.model, tokenizer=self.tokenizer)
         logger.debug("%s Action: %r", str(self), response)
         return post_processing(response[0])
 
     def call_parallel(self, observation: str, n=1) -> list[str]:
-        self.sampling_params.n = n
-        logger.debug("%s Observation (parallel): %r", str(self), clean_obs(observation))
+        logger.debug("%s Observation (parallel n=%d): %r", str(self), n, clean_obs(observation))
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": observation},
         ]
-        response = call_llm(messages, self.sampling_params, model=self.model, tokenizer=self.tokenizer, thinking=True)
-        logger.debug("%s Actions (parallel): %r", str(self), response)
-        return [post_processing(resp) for resp in response]
+        results: list[str] = []
+
+        # 分批逻辑
+        remaining = n
+        while remaining > 0:
+            batch_n = min(remaining, MAX_N)
+            self.sampling_params.n = batch_n
+            response = call_llm(
+                messages,
+                self.sampling_params,
+                model=self.model,
+                tokenizer=self.tokenizer,
+            )
+            results.extend(post_processing(resp) for resp in response)
+            remaining -= batch_n
+
+        logger.debug("%s Actions (parallel n=%d): %r", str(self), n, response)
+        return results
 
     def __str__(self):
         return (f"VLLMAgent(model={self._model_path}, tp={self._tp_size}, "
@@ -148,10 +170,10 @@ Available actions: [fold], [call]
 [Output Format]
 ``` plaintext
 <think> Your thoughts and reasoning </think>
-\\boxed{[ACTION]}
+<answer> [ACTION] </answer>
 ```
 
 [Important Notes]
 1. You must always include the <think> field to outline your reasoning.
-2. Your final action [ACTION] must be one of the available actions, in \\boxed{[ACTION]} format.
+2. Your final action [ACTION] must be one of the available actions.
 '''
