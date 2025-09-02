@@ -16,6 +16,7 @@ class KuhnPokerEnv(ta.Env):
         self.deck = [0, 1, 2]  # 0=J, 1=Q, 2=K
         self.legal_action_tree = {"check": {"check": "showdown", "bet": {"fold": "loser", "call": "showdown2"}}, "bet": {"fold": "loser", "call": "showdown2"}}
         self.player_0_wins = 0
+        self.player_1_wins = 0
         self.changing_starting_player = changing_starting_player
 
         self.new_prompt = prompt_template
@@ -45,6 +46,8 @@ class KuhnPokerEnv(ta.Env):
             if self.state.game_state["player_chips"][0] > self.state.game_state["player_chips"][1]: self.state.set_winner(player_id=0, reason=f"Player 0 won by having more chips at the end of all {self.max_rounds} rounds.")
             elif self.state.game_state["player_chips"][0] < self.state.game_state["player_chips"][1]: self.state.set_winner(player_id=1, reason=f"Player 1 won by having more chips at the end of all {self.max_rounds} rounds.")
             else: self.state.set_draw(reason=f"At the end of {self.max_rounds} rounds, both players had the same number of chips.")
+
+        if self.state.done: return
 
         if DEBUGGING: print(f"### Starting round {self.state.game_state['current_round']} out of {self.max_rounds} rounds.", flush=True)
         if self.default_deck is None:
@@ -149,7 +152,10 @@ class KuhnPokerEnv(ta.Env):
 
     def _set_round_winner(self, player_id: int, reason: str):
         self.state.game_state["player_chips"][player_id] += self.state.game_state["pot"]
-        self.player_0_wins += 1 if player_id == 0 else 0 # count player 0 wins
+        if player_id == 0:
+            self.player_0_wins += 1
+        else:
+            self.player_1_wins += 1
         reason += f" Current scores: Player 0: '{self.state.game_state['player_chips'][0]}'; Player 1: '{self.state.game_state['player_chips'][1]}'"
         # self.state.add_observation(message=reason, observation_type=ta.ObservationType.GAME_MESSAGE) # initialize the next cound
 

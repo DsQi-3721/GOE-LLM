@@ -77,7 +77,9 @@ def run_eval(eval_agent, opponent_agent, each_deck_rounds=500):
             obs0_dict = {}
 
         env0_win_num += sum([env0.player_0_wins for env0 in env0_list])
-        env0_win_chips += sum([env0.state.game_state["player_chips"][0] + 1 for env0 in env0_list])
+        env0_win_chips += sum([env0.state.game_state["player_chips"][0] for env0 in env0_list])
+        assert all(env0.state.game_state['player_chips'][0] + env0.state.game_state['player_chips'][1] == 0 for env0 in env0_list), "Total chips should be 0"
+
         for env0 in env0_list: env0.close()
 
     env0_avg_win_chips = env0_win_chips / (each_deck_rounds * len(all_cards_comb))
@@ -115,8 +117,10 @@ def run_eval(eval_agent, opponent_agent, each_deck_rounds=500):
                     done1_list[idx], step_info = env1_list[idx].step(action=action)
             obs1_dict = {}
 
-        env1_win_num += each_deck_rounds - sum([env1.player_0_wins for env1 in env1_list])
-        env1_win_chips += sum([env1.state.game_state["player_chips"][1] + 1 for env1 in env1_list])
+        env1_win_num += sum([env1.player_1_wins for env1 in env1_list])
+        env1_win_chips += sum([env1.state.game_state["player_chips"][1] for env1 in env1_list])
+        assert all(env1.state.game_state['player_chips'][0] + env1.state.game_state['player_chips'][1] == 0 for env1 in env1_list), "Total chips should be 0"
+
         for env1 in env1_list: env1.close()
 
     env1_avg_win_chips = env1_win_chips / (each_deck_rounds * len(all_cards_comb))

@@ -73,13 +73,13 @@ def run_eval(eval_agent, opponent_agent, max_rounds=1000):
         "max_rounds": max_rounds,
         "as_player_0": {
             "win_num": env0.player_0_wins,
-            "win_chips": (env0.state.game_state["player_chips"][0] + 1),
-            "avg_win_chips": (env0.state.game_state["player_chips"][0] + 1) / env0.max_rounds,
+            "win_chips": (env0.state.game_state["player_chips"][0]),
+            "avg_win_chips": (env0.state.game_state["player_chips"][0]) / env0.max_rounds,
         },
         "as_player_1": {
             "win_num": env1.max_rounds - env1.player_0_wins,
-            "win_chips": (env1.state.game_state["player_chips"][1] + 1),
-            "avg_win_chips": (env1.state.game_state["player_chips"][1] + 1) / env1.max_rounds,
+            "win_chips": (env1.state.game_state["player_chips"][1]),
+            "avg_win_chips": (env1.state.game_state["player_chips"][1]) / env1.max_rounds,
         },
         "decision_history": dh.tree,
         "wrong_action": wrong_action,
