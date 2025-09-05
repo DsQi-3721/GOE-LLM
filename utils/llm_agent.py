@@ -5,8 +5,8 @@ from vllm import LLM, SamplingParams
 
 import logging
 from threading import Lock
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 # ===== 默认配置（可改） =====
 DEFAULT_MODEL_PATH = "/data/models/Qwen2.5-3B-Instruct"

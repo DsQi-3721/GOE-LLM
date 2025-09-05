@@ -3,8 +3,8 @@ from utils.random_agent import RandomAgent, GtoAgent, describe_opponent
 import logging
 import random
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 class DynamicAgent(Agent):
     def __init__(self, interval_range: tuple, strategies: list, randomize_strategy: bool = False):

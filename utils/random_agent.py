@@ -1,8 +1,8 @@
 from textarena.core import Agent
 
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 import random
 
@@ -31,13 +31,10 @@ class RandomAgent(Agent):
     def __str__(self):
         return "RandomAgent"
     
-
 class GtoAgent(Agent):
-    def __init__(self, alpha: float = 0, bluffing_counter = False):
-        super().__init__()
+    def __init__(self, alpha: float = 0):
         self.alpha = alpha
-        self.bluffing_counter = bluffing_counter
-        assert 0 <= alpha <= 1, "Alpha must be between 0 and 1"
+        assert 0 <= alpha <= 1/3, "Alpha must be between 0 and 1/3"
 
         # GTO strategy tables [0, 1/3]
         self.first_player_gto_1 = {
@@ -58,34 +55,6 @@ class GtoAgent(Agent):
         }
         self.agent_name = f"GtoAgent({self.alpha})"
 
-        # Bluffing strategy (as first Player)
-        if alpha > 1/3:
-            # min(p, 1), max(p, 0)
-            self.first_player_gto_1 = {k: {k2: max(0, min(1, v2)) for k2, v2 in v.items()} for k, v in self.first_player_gto_1.items()}
-            self.first_player_gto_2 = {k: {k2: max(0, min(1, v2)) for k2, v2 in v.items()} for k, v in self.first_player_gto_2.items()}
-            self.agent_name = f"Bluffing({self.alpha})"
-
-        # Counter bluffing strategy (as second Player)
-        if bluffing_counter:
-            self.alpha = 1/3
-            self.first_player_gto_1 = {
-                "K": {'bet': 1.0, 'check': 0.0},
-                "Q": {'bet': 0.0, 'check': 1.0},
-                "J": {'bet': 1/3, 'check': 2/3},
-            }
-            self.first_player_gto_2 = {
-                "K": {'call': 1.0, 'fold': 0.0},
-                "Q": {'call': 2/3, 'fold': 1/3},
-                "J": {'call': 0.0, 'fold': 1.0}
-            }
-            # always call/bet with K, Q; always fold/check with J
-            self.second_player_gto = {
-                "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
-                "Q": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
-                "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
-            }
-            self.agent_name = f"Bluffing_counter({self.alpha})"
-
     def __call__(self, observation: str) -> str:
         """
         Call the agent with an observation and return a GTO action.
@@ -97,6 +66,13 @@ class GtoAgent(Agent):
         my_card = info[1]
 
         action_seq = self.extract_actions(info)
+        assert len(action_seq) <= 2, f"Unexpected action sequence length: {len(action_seq)}"
+        if 'first to act this round' in observation:
+            assert len(action_seq) % 2 == 0, f"First player should have even number of actions in sequence, got: {action_seq}"
+        elif 'second to act this round' in observation:
+            assert len(action_seq) % 2 == 1, f"Second player should have odd number of actions in sequence, got: {action_seq}"
+        else:
+            raise ValueError("Cannot determine if first or second player from observation")
 
         rand_num = random.random()
         if len(action_seq) == 0:
@@ -160,6 +136,114 @@ class GtoAgent(Agent):
             assert action.startswith('[') and action.endswith(']'), f"Unexpected action format: {action}"
             actions.append(action[1:-1])
         return actions
+
+class BluffAgent(GtoAgent):
+    def __init__(self, alpha: float = 1/2, bluff_as_second_player: float = 0):
+        assert 1/3 < alpha <= 1, "Alpha must be between 1/3 and 1 for bluffing strategy"
+        self.first_player_gto_1 = {
+            "K": {'bet': 3 * alpha, 'check': 1 - 3 * alpha},
+            "Q": {'bet': 0.0, 'check': 1.0},
+            "J": {'bet': alpha, 'check': 1 - alpha}
+        }
+        self.first_player_gto_2 = {
+            "K": {'call': 1.0, 'fold': 0.0},
+            "Q": {'call': alpha + 1/3, 'fold': 2/3 - alpha},
+            "J": {'call': 0.0, 'fold': 1.0}
+        }
+        # min(p, 1), max(p, 0)
+        self.first_player_gto_1 = {k: {k2: max(0, min(1, v2)) for k2, v2 in v.items()} for k, v in self.first_player_gto_1.items()}
+        self.first_player_gto_2 = {k: {k2: max(0, min(1, v2)) for k2, v2 in v.items()} for k, v in self.first_player_gto_2.items()}
+        
+        assert 0 <= bluff_as_second_player <= 1, "bluff_as_second_player must be between 0 and 1"
+        self.second_player_gto = {
+            "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "Q": {'bet': {'call': 1/3, 'fold': 1 - 1/3}, 'check': {'bet': bluff_as_second_player, 'check': 1.0 - bluff_as_second_player}},
+            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 1/3 + 2/3*bluff_as_second_player, 'check': 1 - 1/3 - 2/3*bluff_as_second_player}}
+        }
+
+        self.agent_name = f"Bluffing({alpha}, {bluff_as_second_player})"
+
+class ValueAgent(GtoAgent):
+    def __init__(self):
+        # Value betting strategy, for countering bluffing strategy
+        # As player 0:
+        # first check all, opponent (bluff) always bet, we always call with K, Q; always fold with J
+        self.first_player_gto_1 = {
+            "K": {'bet': 0.0, 'check': 1.0},
+            "Q": {'bet': 0.0, 'check': 1.0},
+            "J": {'bet': 0.0, 'check': 1.0},
+        }
+        self.first_player_gto_2 = {
+            "K": {'call': 1.0, 'fold': 0.0},
+            "Q": {'call': 1.0, 'fold': 0.0},
+            "J": {'call': 0.0, 'fold': 1.0}
+        }
+        # As player 1:
+        # always call/bet with K, Q; always fold/check with J
+        self.second_player_gto = {
+            "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "Q": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
+        }
+        self.agent_name = f"ValueAgent()"
+
+class PassiveAgent(GtoAgent):
+    def __init__(self):
+        # Passive strategy, for countering value betting strategy
+        # As player 0:
+        # first check all, we always fold with J, Q; always call with K
+        self.first_player_gto_1 = {
+            "K": {'bet': 0.0, 'check': 1.0},
+            "Q": {'bet': 0.0, 'check': 1.0},
+            "J": {'bet': 0.0, 'check': 1.0},
+        }
+        self.first_player_gto_2 = {
+            "K": {'call': 1.0, 'fold': 0.0},
+            "Q": {'call': 0.0, 'fold': 1.0},
+            "J": {'call': 0.0, 'fold': 1.0}
+        }
+        # As player 1:
+        # always fold/check with Q, J; always call/bet with K
+        self.second_player_gto = {
+            "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "Q": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}},
+            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
+        }
+        self.agent_name = f"PassiveAgent()"
+
+class AggressiveAgent(GtoAgent):
+    '''
+    Aggressive strategy, for countering PassiveAgent
+    As player 0: bigger alpha, exploit PassiveAgent more
+    As player 1: bigger beta, exploit PassiveAgent more
+    
+    Example: 
+    
+    - Mixed Strategy: AggressiveAgent(1/3,1/3), AggressiveAgent(1/2, 1/2), AggressiveAgent(2/3, 2/3)
+    - Pure Strategy: AggressiveAgent(1, 1)
+    '''
+    def __init__(self, alpha: float = 1/3, beta: float = 1/2):
+        # Aggressive(kind of bluffing) strategy, for countering PassiveAgent
+        assert 0 <= alpha <= 1, "Alpha must be between 0 and 1"
+        assert 0 < beta <= 1, "Beta must be between 0 and 1"
+        # As player 0: bigger alpha, exploit PassiveAgent more
+        self.first_player_gto_1 = {
+            "K": {'bet': 1.0, 'check': 0.0},
+            "Q": {'bet': 0.0, 'check': 1.0},
+            "J": {'bet': 1.0, 'check': 0.0},
+        }
+        self.first_player_gto_2 = {
+            "K": {'call': 1.0, 'fold': 0.0},
+            "Q": {'call': 1.0 - alpha, 'fold': alpha},
+            "J": {'call': 0.0, 'fold': 1.0}
+        }
+        # As player 1: bigger beta, exploit PassiveAgent more
+        self.second_player_gto = {
+            "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "Q": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}},
+            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 1/3 + (1-1/3)*beta, 'check': 1 - 1/3 - (1-1/3)*beta}}
+        }
+        self.agent_name = f"AggressiveAgent({alpha}, {beta})"
 
 def describe_opponent(agent_name: str) -> str:
     """
