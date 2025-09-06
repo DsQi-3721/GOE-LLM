@@ -101,7 +101,7 @@ class GtoAgent(Agent):
                 action = "[call]"
             else:
                 action = "[fold]"
-            
+
         logger.debug("%s Action: %r", str(self), action)
         return action
 
@@ -164,10 +164,20 @@ class BluffAgent(GtoAgent):
         self.agent_name = f"Bluffing({alpha}, {bluff_as_second_player})"
 
 class ValueAgent(GtoAgent):
-    def __init__(self):
-        # Value betting strategy, for countering bluffing strategy
-        # As player 0:
-        # first check all, opponent (bluff) always bet, we always call with K, Q; always fold with J
+    '''
+    Value betting strategy, for countering Aggressive strategy
+
+    Example:
+    - Mixed Strategy: ValueAgent(1/3), ValueAgent(1/2), ValueAgent(2/3)
+    - Pure Strategy: ValueAgent(1)
+        - first check all, always call with K, Q; always fold with J
+        - always call/bet with K, Q; always fold/check with J
+    '''
+    def __init__(self, factor: float = 1):
+        assert 0 <= factor <= 1, "Factor must be between 0 and 1"
+        # As player 0: exploit AggressiveAgent(1) +(2*alpha-1)/6 > -1/18 --> alpha > 1/3
+        # advanced: for being exploited by PassiveAgent(1), -alpha/6 < -1/18, --> alpha > 1/3
+        alpha = 1/3 + (1 - 1/3) * factor
         self.first_player_gto_1 = {
             "K": {'bet': 0.0, 'check': 1.0},
             "Q": {'bet': 0.0, 'check': 1.0},
@@ -175,75 +185,87 @@ class ValueAgent(GtoAgent):
         }
         self.first_player_gto_2 = {
             "K": {'call': 1.0, 'fold': 0.0},
-            "Q": {'call': 1.0, 'fold': 0.0},
+            "Q": {'call': alpha, 'fold': 1.0 - alpha},
             "J": {'call': 0.0, 'fold': 1.0}
         }
-        # As player 1:
-        # always call/bet with K, Q; always fold/check with J
+        # As player 1: exploit AggressiveAgent(1) +(2*beta-1)/6 > 1/18 --> beta > 2/3
+        # advanced: for being exploited by PassiveAgent(1), -(beta)/6 < 1/18, --> beta > -1/3
+        beta = 2/3 + (1 - 2/3) * factor
         self.second_player_gto = {
             "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
-            "Q": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "Q": {'bet': {'call': beta, 'fold': 1.0 - beta}, 'check': {'bet': beta, 'check': 1.0 - beta}},
             "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
         }
-        self.agent_name = f"ValueAgent()"
+        self.agent_name = f"ValueAgent({factor})"
 
 class PassiveAgent(GtoAgent):
-    def __init__(self):
-        # Passive strategy, for countering value betting strategy
-        # As player 0:
-        # first check all, we always fold with J, Q; always call with K
+    '''
+    Passive strategy, for countering value betting strategy
+
+    Example:
+    - Mixed Strategy: PassiveAgent(1/3), PassiveAgent(1/2), PassiveAgent(2/3)
+    - Pure Strategy: PassiveAgent(1)
+        - first check all, always fold with J, Q; always call with K
+        - always fold/check with Q, J; always call/bet with K
+    '''
+    def __init__(self, factor: float = 1):
+        assert 0 <= factor <= 1, "Factor must be between 0 and 1"
+        # As player 0: exploit ValueAgent(1) +alpha/6 > -1/18 --> alpha > -1/3
+        # advanced: for being exploited by AggressiveAgent(1), -(2*alpha-1)/6 < -1/18, --> alpha > 2/3
+        alpha = 2/3 + (1 - 2/3) * factor
         self.first_player_gto_1 = {
             "K": {'bet': 0.0, 'check': 1.0},
             "Q": {'bet': 0.0, 'check': 1.0},
             "J": {'bet': 0.0, 'check': 1.0},
+        }
+        self.first_player_gto_2 = {
+            "K": {'call': 1.0, 'fold': 0.0},
+            "Q": {'call': 1 - alpha, 'fold': alpha},
+            "J": {'call': 0.0, 'fold': 1.0}
+        }
+        # As player 1: exploit ValueAgent(1) +beta/6 > 1/18 --> beta > 1/3
+        # advanced: for being exploited by AggressiveAgent(1), -(2*beta-1)/6 < 1/18, --> beta > 1/3
+        beta = 1/3 + (1 - 1/3) * factor # exploit > +1/18
+        self.second_player_gto = {
+            "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
+            "Q": {'bet': {'call': 1 - beta, 'fold': beta}, 'check': {'bet': 1 - beta, 'check': beta}},
+            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
+        }
+        self.agent_name = f"PassiveAgent({factor})"
+
+class AggressiveAgent(GtoAgent):
+    '''
+    Aggressive(kind of bluffing) strategy, for countering Passive strategy
+    
+    Example: 
+    
+    - Mixed Strategy: AggressiveAgent(1/3), AggressiveAgent(1/2), AggressiveAgent(2/3)
+    - Pure Strategy: AggressiveAgent(1)
+    '''
+    def __init__(self, factor: float = 1):
+        assert 0 <= factor <= 1, "Factor must be between 0 and 1"
+        # As player 0: exploit PassiveAgent(1) +alpha/6 > -1/18 --> alpha > -1/3
+        # advanced: for being exploited by ValueAgent(1), -(2*alpha-1)/6 < -1/18, --> alpha > 2/3
+        alpha = 2/3 + (1 - 2/3) * factor
+        self.first_player_gto_1 = {
+            "K": {'bet': 1.0, 'check': 0.0},
+            "Q": {'bet': 0.0, 'check': 1.0},
+            "J": {'bet': alpha, 'check': 1.0 - alpha},
         }
         self.first_player_gto_2 = {
             "K": {'call': 1.0, 'fold': 0.0},
             "Q": {'call': 0.0, 'fold': 1.0},
             "J": {'call': 0.0, 'fold': 1.0}
         }
-        # As player 1:
-        # always fold/check with Q, J; always call/bet with K
+        # As player 1: exploit PassiveAgent(1) +beta/6 > 1/18 --> beta > 1/3
+        # advanced: for being exploited by ValueAgent(1), -(2*beta-1)/6 < 1/18, --> beta > 1/3
+        beta = 1/3 + (1 - 1/3) * factor
         self.second_player_gto = {
             "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
             "Q": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}},
-            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}}
+            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': beta, 'check': 1.0 - beta}}
         }
-        self.agent_name = f"PassiveAgent()"
-
-class AggressiveAgent(GtoAgent):
-    '''
-    Aggressive strategy, for countering PassiveAgent
-    As player 0: bigger alpha, exploit PassiveAgent more
-    As player 1: bigger beta, exploit PassiveAgent more
-    
-    Example: 
-    
-    - Mixed Strategy: AggressiveAgent(1/3,1/3), AggressiveAgent(1/2, 1/2), AggressiveAgent(2/3, 2/3)
-    - Pure Strategy: AggressiveAgent(1, 1)
-    '''
-    def __init__(self, alpha: float = 1/3, beta: float = 1/2):
-        # Aggressive(kind of bluffing) strategy, for countering PassiveAgent
-        assert 0 <= alpha <= 1, "Alpha must be between 0 and 1"
-        assert 0 < beta <= 1, "Beta must be between 0 and 1"
-        # As player 0: bigger alpha, exploit PassiveAgent more
-        self.first_player_gto_1 = {
-            "K": {'bet': 1.0, 'check': 0.0},
-            "Q": {'bet': 0.0, 'check': 1.0},
-            "J": {'bet': 1.0, 'check': 0.0},
-        }
-        self.first_player_gto_2 = {
-            "K": {'call': 1.0, 'fold': 0.0},
-            "Q": {'call': 1.0 - alpha, 'fold': alpha},
-            "J": {'call': 0.0, 'fold': 1.0}
-        }
-        # As player 1: bigger beta, exploit PassiveAgent more
-        self.second_player_gto = {
-            "K": {'bet': {'call': 1.0, 'fold': 0.0}, 'check': {'bet': 1.0, 'check': 0.0}},
-            "Q": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 0.0, 'check': 1.0}},
-            "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 1/3 + (1-1/3)*beta, 'check': 1 - 1/3 - (1-1/3)*beta}}
-        }
-        self.agent_name = f"AggressiveAgent({alpha}, {beta})"
+        self.agent_name = f"AggressiveAgent({factor})"
 
 def describe_opponent(agent_name: str) -> str:
     """
