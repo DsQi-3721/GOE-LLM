@@ -1,5 +1,8 @@
 import textarena as ta
-from utils.random_agent import RandomAgent, GtoAgent
+from utils.random_agent import RandomAgent, GtoAgent, describe_opponent
+from utils.random_agent import BluffAgent, ValueAgent, PassiveAgent, AggressiveAgent
+from utils.dynamic_agent import DynamicAgent
+import json
 import sys
 import re
 
@@ -17,6 +20,16 @@ class DecisionHistory():
                 "J": {},
             }
         }
+
+def obs_opponent_description(agent, opponent_agent, observation):
+    if hasattr(agent, "_model_path") and agent._model_path:# and "mixedoppo" in agent._model_path:
+        return observation.replace("[Output Format]", f"""[Opponent Model]
+The opponent is estimated to follow this strategy: {describe_opponent(str(opponent_agent))}
+You may reason about the opponent's ranges, betting patterns, and card strengths. 
+
+[Output Format]""")
+    else:
+        return observation
 
 def run_eval(eval_agent, opponent_agent, each_deck_rounds=500):
     all_cards_comb = [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]  # (player_0_card, player_1_card)
@@ -65,7 +78,7 @@ def run_eval(eval_agent, opponent_agent, each_deck_rounds=500):
                         action = agents[player_id](observation)
                         done0_list[i], step_info = env0.step(action=action)
                     elif player_id == 0:
-                        obs0_dict.setdefault(str(observation), []).append(i)
+                        obs0_dict.setdefault(obs_opponent_description(agents[0], agents[1], observation), []).append(i)
                         
             for obs0_str, idxs in obs0_dict.items():
                 call_info["call_parallel_num_0"] += 1
@@ -106,7 +119,7 @@ def run_eval(eval_agent, opponent_agent, each_deck_rounds=500):
                         action = agents[player_id](observation)
                         done1_list[i], step_info = env1.step(action=action)
                     elif player_id == 1:
-                        obs1_dict.setdefault(str(observation), []).append(i)
+                        obs1_dict.setdefault(obs_opponent_description(agents[1], agents[0], observation), []).append(i)
                         
             for obs1_str, idxs in obs1_dict.items():
                 call_info["call_parallel_num_1"] += 1
@@ -150,7 +163,14 @@ if __name__ == "__main__":
     all_opponents = {
         "random": [RandomAgent()],
         "gto": [GtoAgent(0), GtoAgent(1/6), GtoAgent(1/3)],
-        "bluffing": [GtoAgent(1/2), GtoAgent(2/3), GtoAgent(5/6), GtoAgent(1)],
+        "bluffing": [BluffAgent(1/2), BluffAgent(2/3), BluffAgent(5/6), BluffAgent(1)],
+        "bluffing_2": [BluffAgent(1/2, 1/2), BluffAgent(2/3, 2/3), BluffAgent(5/6, 5/6), BluffAgent(1, 1)],
+        # "bluffing_2": [BluffAgent(1/2, 1/2), BluffAgent(1/2, 5/6),  BluffAgent(1/2, 1),
+        #                BluffAgent(5/6, 1/2), BluffAgent(5/6, 5/6), BluffAgent(5/6, 1),
+        #                BluffAgent(1, 1/2),   BluffAgent(1, 5/6),   BluffAgent(1, 1)],
+        "value_betting": [ValueAgent(0), ValueAgent(1/3), ValueAgent(1/2), ValueAgent(2/3), ValueAgent(1)],
+        "passive": [PassiveAgent(0), PassiveAgent(1/3), PassiveAgent(1/2), PassiveAgent(2/3), PassiveAgent(1)],
+        "aggressive": [AggressiveAgent(0), AggressiveAgent(1/3), AggressiveAgent(1/2), AggressiveAgent(2/3), AggressiveAgent(1)],
     }
 
     # model path in cmd line: python -m utils.eval /data/models/Qwen2.5-3B-Instruct

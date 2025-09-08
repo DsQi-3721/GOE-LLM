@@ -28,6 +28,18 @@ class RandomAgent(Agent):
         logger.debug("%s Action: %r", str(self), action.strip("'"))
         return action
 
+    def call_parallel(self, observation: str, n: int) -> list:
+        """
+        Call the agent with a list of observations and return a list of random actions.
+        :param observations: A list of observation strings from the environment.
+        :return: A list of random action strings.
+        """
+        actions = []
+        for i in range(n):
+            action = self.__call__(observation)
+            actions.append(action)
+        return actions
+
     def __str__(self):
         return "RandomAgent"
     
@@ -161,7 +173,7 @@ class BluffAgent(GtoAgent):
             "J": {'bet': {'call': 0.0, 'fold': 1.0}, 'check': {'bet': 1/3 + 2/3*bluff_as_second_player, 'check': 1 - 1/3 - 2/3*bluff_as_second_player}}
         }
 
-        self.agent_name = f"Bluffing({alpha}, {bluff_as_second_player})"
+        self.agent_name = f"BluffAgent({alpha}, {bluff_as_second_player})"
 
 class ValueAgent(GtoAgent):
     '''
@@ -283,7 +295,7 @@ def describe_opponent(agent_name: str) -> str:
                 "They rarely fold against bets if they hold K or Q, but fold J consistently. "
                 "They are sticky and difficult to bluff.")
     
-    if agent_name.startswith("Bluffing"):
+    if agent_name.startswith("BluffAgent"):
         # extract alpha if present
         try:
             alpha = float(agent_name.split("(")[-1].rstrip(")"))
@@ -333,6 +345,32 @@ def describe_opponent(agent_name: str) -> str:
                 f"The current strategy is: {current_strategy}. "
                 f"This agent adapts its behavior dynamically, making it harder to predict.")
 
+    version = "v2" 
+    if version == "v1": # deprecated, for experiment: 09-06-19-41_3x5_mixedoppo_oppodesc
+        if agent_name.startswith("ValueAgent"):
+            return ("The opponent plays a value-heavy strategy, focusing on betting and calling with strong hands (K, Q). "
+                    "They can be exploited by betting only with the strongest hand (K). ")
+        if agent_name.startswith("PassiveAgent"):
+            return ("The opponent plays a very passive strategy, only betting with the strongest hand (K). "
+                    "They can be exploited by betting more with 'J'. ")
+        if agent_name.startswith("AggressiveAgent"):
+            return ("The opponent plays an aggressive strategy, frequently betting with 'J'. "
+                    "They can be exploited by calling more often with strong hands (K, Q).")
+    elif version == "v2":
+        if agent_name.startswith("ValueAgent"):
+            return ("The opponent rarely bluffs. "
+                    "You should play passively. If first to act, always check first, then only call with the 'K'. "
+                    "If second to act, bet/call with 'K'; check/fold with 'Q' and 'J'.")
+        if agent_name.startswith("PassiveAgent"):
+            return ("The opponent plays a very passive strategy. "
+                    "You should play bluff-heavy. With 'K', always bet/call. With 'J', always bet but never call. With 'Q', check/fold.")
+        if agent_name.startswith("AggressiveAgent"):
+            return ("The opponent plays an aggressive strategy. "
+                    "You should play value-heavy. If first to act, always check first, then call with 'K' or 'Q'. "
+                    "If second to act, bet/call with 'K' and 'Q'; check/fold with 'J'.")
+    else:
+        raise ValueError(f"Unknown version: {version}")
+    
     # fallback
     raise ValueError(f"Unknown agent name: {agent_name}")
     return "The opponent’s strategy is unknown or unusual."
