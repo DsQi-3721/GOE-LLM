@@ -42,7 +42,7 @@ class KuhnPokerEnv(ta.Env):
         self.state.game_state["current_round"] += 1
         if self.state.game_state["current_round"] > self.max_rounds: # check if game is complete
             # determine winner 
-            print(f"The final scores are: Player 0: '{self.state.game_state['player_chips'][0]}'; Player 1: '{self.state.game_state['player_chips'][1]}'", flush=True)
+            # print(f"The final scores are: Player 0: '{self.state.game_state['player_chips'][0]}'; Player 1: '{self.state.game_state['player_chips'][1]}'", flush=True)
             if self.state.game_state["player_chips"][0] > self.state.game_state["player_chips"][1]: self.state.set_winner(player_id=0, reason=f"Player 0 won by having more chips at the end of all {self.max_rounds} rounds.")
             elif self.state.game_state["player_chips"][0] < self.state.game_state["player_chips"][1]: self.state.set_winner(player_id=1, reason=f"Player 1 won by having more chips at the end of all {self.max_rounds} rounds.")
             else: self.state.set_draw(reason=f"At the end of {self.max_rounds} rounds, both players had the same number of chips.")
@@ -131,6 +131,11 @@ class KuhnPokerEnv(ta.Env):
             return self.state.step(rotate_player=rotate_player)
 
         self.history.append(move)  # Store the action in history
+        step_info = {
+            "player_id": self.state.current_player_id, 
+            "player_card": self._rank_to_str(self.state.game_state["player_cards"][self.state.current_player_id]), 
+            "history": self.history.copy() # include the current action(history[-1])
+        }
         # execute move
         # self.state.add_observation(message=f"Player {self.state.current_player_id}, submitted move: '[{move}]'.", observation_type=ta.ObservationType.GAME_ACTION_DESCRIPTION)
         self.state.game_state["current_legal_action_tree"] = self.state.game_state["current_legal_action_tree"][move]
@@ -148,7 +153,8 @@ class KuhnPokerEnv(ta.Env):
             pass
             # legal_actions = ', '.join([f"[{k}]" for k in self.state.game_state["current_legal_action_tree"].keys()])
             # self.state.add_observation(to_id=1-self.state.current_player_id, message=f"Your available actions are: {legal_actions}", observation_type=ta.ObservationType.GAME_BOARD)
-        return self.state.step(rotate_player=rotate_player)
+        # return self.state.step(rotate_player=rotate_player)
+        return self.state.step(rotate_player=rotate_player)[0], step_info
 
     def _set_round_winner(self, player_id: int, reason: str):
         self.state.game_state["player_chips"][player_id] += self.state.game_state["pot"]
